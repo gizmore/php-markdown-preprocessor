@@ -1,0 +1,40 @@
+{
+	"name" : "gizmore/pp4md",
+	"description" : "Convert between various markdown-like text encodings.",
+	"type" : "library",
+	"license" : "MIT",
+	"authors" : [{
+			"name" : "gizmore",
+			"email" : "gizmore@wechall.net"
+		}
+	],
+	"repositories" : [{
+			"type" : "package",
+			"package" : {
+				"name" : "gizmore/php-filewalker",
+				"version" : "7.0.1",
+				"type" : "library",
+				"source" : {
+					"url" : "https://github.com/gizmore/php-filewalker",
+					"type" : "git",
+					"reference" : "main"
+				}
+			}
+		}
+	],
+	"minimum-stability" : "dev",
+	"bin" : [
+		"bin/pp4md.php",
+		"bin/pp4md.cmd",
+		"bin/pp4md"
+	],
+	"require" : {
+		"php" : ">= 8.0",
+		"gizmore/php-filewalker" : "7.0.1"
+	},
+	"autoload" : {
+		"psr-4" : {
+			"gizmore\\pp4md\\" : "src/"
+		}
+	}
+}

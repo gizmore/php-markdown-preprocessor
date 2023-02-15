@@ -1,0 +1,4 @@
+#!/bin/bash
+set -euo pipefail
+path="$(dirname "$0")/pp4md.php"
+php $path $@
