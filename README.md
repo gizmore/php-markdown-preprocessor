@@ -42,3 +42,13 @@ D) Ideas?
  
  - `%dd%gizmore.org%`: make a link to `//gizmore.org`. Put a `![text](url)` markdown image preview beside the link.
  
+ 
+---
+
+## Usage
+
+
+
+
+#### License MIT
+##### (c)2023 gizmore@wechall.net
