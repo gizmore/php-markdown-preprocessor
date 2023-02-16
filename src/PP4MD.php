@@ -1,6 +1,9 @@
 <?php
 namespace gizmore\pp4md;
 
+use gizmore\Filewalker;
+use gizmore\pp4md\Quicklinks;
+
 /**
  * (Pre)Processor for markdown-like text.
  *
@@ -9,8 +12,13 @@ namespace gizmore\pp4md;
  * @version 7.0.2
  * @since 7.0.2
  */
-final class PP4MD
+class PP4MD
 {
+	/**
+	 * Just callbacks.
+	 * @var callable[]
+	 */
+	protected array $lineFilters = [];
 
 	/**
 	 * Call this to include and init.
@@ -20,35 +28,40 @@ final class PP4MD
 		return new self();
 	}
 
-	public function __construct()
+	protected function __construct()
 	{
-		$this->format(self::UNICODE);
+		$this->format(OutputFormat::Unicode);
 	}
-
+	
 	# ##############
 	# ## Options ###
 	# ##############
-	# Output formats
-	const ASCII = 'ascii';
-	const UNICODE = 'unicode';
-	const ASCIICODE = 'asciicode';
-	const MARKDOWN = 'markdown';
-	const YOUTUBE = 'youtube';
-	const GITHUB = 'github';
-	const TWITTER = 'twitter';
+	/**
+	 * Current format method.
+	 * @var callable
+	 */
+	protected $callable = null;
 
-	private $callable = null;
+	public int $format = OutputFormat::Unicode;
 
-	public string $format = self::UNICODE;
-
-	public function format(string $format): self
+	public function format(int $format): self
 	{
 		$this->format = $format;
+		
+		if (!isset(OutputFormat::$FORMATS[$format]))
+		{
+			$this->error(-8, 'Invalid output format: ' . $format);
+		}
+		
+		$format = OutputFormat::$FORMATS[$format];
+		
 		$cb = [
 			$this,
 			"_{$format}"
 		];
+		
 		$this->callable = $cb;
+
 		return $this;
 	}
 
@@ -57,15 +70,15 @@ final class PP4MD
 	 *
 	 * @var resource
 	 */
-	private $in = STDIN;
+	public $in = STDIN;
 
 	/**
 	 *
 	 * @var resource
 	 */
-	private $out = STDOUT;
+	public $out = STDOUT;
 
-	private ?string $infile = null;
+	public ?string $infile = null;
 
 	# full path
 	public function infile(string $infile = null, bool $recursive = true): self
@@ -177,12 +190,102 @@ final class PP4MD
 	# ###########
 	# ## Main ###
 	# ###########
+	const E = Expressions::class;
+	const Q = Quicklinks::class;
+	
+	private static $BRNL = [
+	];
+	
+	private function buildFilters(): void
+	{
+		$this->lineFilters = [];
+		if ($this->brnl)
+		{
+			$this->lineFilters[] = [self::E, 'BRNL'];
+		}
+		if ($this->rulers &&
+			OutputFormat::wantsRuler($this->format))
+		{
+			$this->lineFilters[] = [self::E, 'ASCII_RULER'];
+		}
+		if ($this->quicklinks &&
+			OutputFormat::wantsQuicklinks($this->format))
+		{
+			$this->lineFilters[] = [self::Q, 'processLine'];
+		}
+	}
+	
 	public function execute(): void
+	{
+		$this->check();
+		$this->buildFilters();
+		
+		if ($this->infile)
+		{
+			if (is_dir($this->infile))
+			{
+				# recurse depth
+				$rc = ($this->recursive) ? 32 : 0;
+				$cb = [$this, 'executeFile'];
+				Filewalker::traverse($this->infile,
+					$this->filePattern, $cb, null, $rc);
+			}
+			else
+			{
+				$this->executeFile(
+					basename($this->infile),
+					$this->infile);
+			}
+		}
+		else # stdin, no dir
+		{
+			try
+			{
+				$this->open();
+				$this->__processHandles($this->in, $this->out);
+			}
+			finally
+			{
+				$this->close();
+			}
+		}
+	}
+	
+	public function processString(string $content): string
 	{
 		try
 		{
+			$this->buildFilters();
+			$filename = tempnam(sys_get_temp_dir(), 'GDO');
+			file_put_contents($filename, $content);
+			$in = fopen($filename, 'r');
+			$processed = '';
+			$this->__processHandles($in, STDOUT, $processed);
+			return $processed;
+		}
+		finally
+		{
+			@fclose(@$in);
+			@unlink(@$filename);
+		}
+	}
+	
+	private function processLine(string $line): string
+	{
+		return $this->__process($line);
+	}
+	
+	###############
+	### Private ###
+	###############
+	private function executeFile(string $entry, string $fullpath): void
+	{
+		try
+		{
+			$this->infile = $fullpath;
+			$this->outfile = $this->getOutPath();
 			$this->open();
-			$this->processFD($this->in, $this->out);
+			$this->__processHandles($this->in, $this->out);
 		}
 		finally
 		{
@@ -190,31 +293,16 @@ final class PP4MD
 		}
 	}
 
-	/**
-	 *
-	 * @param resource $in
-	 * @param resource $out
-	 */
-	public function processFD($in, $out): void
-	{
-		$this->__processHandles($in, $out);
-	}
-
-	public function processLine(string $line): string
-	{
-		return $this->__process($line);
-	}
-
 	# ##########
 	# ## I/O ###
 	# ##########
 	private function open(): void
 	{
-		if ($this->in !== STDIN)
+		if ($this->infile)
 		{
 			$this->in = fopen($this->infile, "r");
 		}
-		if ($this->out !== STDOUT)
+		if ($this->outfile || $this->recursive)
 		{
 			$path = $this->getOutPath();
 			if (file_exists($path) && ( !$this->force))
@@ -239,41 +327,45 @@ final class PP4MD
 		}
 	}
 
-	private function __processHandles($in, $out): void
+	private function __processHandles($in, $out, string &$capture=''): void
 	{
 		while ($line = fgets($in))
 		{
-			$this->bytesProcessed += strlen($line);
+			$read = strlen($line);
 			$line = $this->processLine($line);
 			fwrite($out, $line);
+			$capture .= $line;
+			$this->bytesProcessed += $read;
 		}
 		$this->filesProcessed++;
 	}
-
+	
 	# ######################
 	# ## Line processors ###
 	# ######################
 	private function __process(string $line): string
 	{
 		$this->line++;
-		if ($line = trim($line))
-		{
-			$line = call_user_func($this->callable, $line);
-		}
+		# generic line filters.
+		$line = $this->_lineFilters(trim($line));
+		# formats line filters.
+		$line = call_user_func($this->callable, $line);
 		$this->linesProcessed++;
+		return $line;
+	}
+	
+	private function _lineFilters(string $line): string
+	{
+		foreach ($this->lineFilters as $filter)
+		{
+			$line = call_user_func($filter, $line);
+		}
 		return $line;
 	}
 
 	private function _ascii(string $line): string
 	{
-		if ($this->rulers)
-		{
-			$line = Expressions::ASCII_RULER($line);
-		}
-		if ($this->brnl)
-		{
-			$line = Expressions::BRNL($line);
-		}
+		$line = Expressions::ASCII_URLS($line);
 		return $line;
 	}
 
@@ -323,6 +415,17 @@ final class PP4MD
 		$this->printUsage( -1, $error);
 	}
 
+	private function check(): void
+	{
+		if ($this->recursive)
+		{
+			if ($this->isSTDIN() || (!$this->infile) || (!is_dir($this->infile)))
+			{
+				$this->error(-7, 'Cannot open recursive Input.');
+			}
+		}
+	}
+	
 	private function printUsage(int $code, string $error = ''): void
 	{
 		global $argv;
@@ -336,18 +439,18 @@ final class PP4MD
 		die($code);
 	}
 
-	public function error(int $code, string $error): void
+	private function error(int $code, string $error): void
 	{
 		fwrite(STDERR, "Error: {$error}\n");
 		die($code);
 	}
 
-	public function message(string $message): void
+	private function message(string $message): void
 	{
 		fwrite(STDOUT, "{$message}\n");
 	}
 
-	public function debug(string $message): void
+	private function debug(string $message): void
 	{
 		if ($this->verbose)
 		{

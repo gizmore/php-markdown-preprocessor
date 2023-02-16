@@ -8,16 +8,24 @@ require 'vendor/autoload.php';
 # Sanity
 $pp = PP4MD::init();
 assert($pp instanceof PP4MD, 'Let\'s check if PP is a PP.');
-assert($pp->processLine("::") === '::', 'Check if :: keeps the same in default mode.');
+assert($pp->processString("::") === '::', 'Check if :: keeps the same in default mode.');
 #
 # ASCII Rulers 
 $in = '---';
-assert($pp->format(PP4MD::ASCII)->processLine($in) === $in, 'Test deactivated ASCII ruler.');
-assert($pp->rulers()->processLine($in) !== $in, 'Test deactivated ASCII ruler.');
+assert($pp->format(OutputFormat::ASCII)->processString($in) === $in, 'Test deactivated ASCII ruler.');
+assert($pp->rulers()->processString($in) !== $in, 'Test activated ASCII ruler.');
 #
 # PHP BRNL
 $in = '%%';
-assert(strpos($pp->brnl()->processLine($in), 'br/'), 'Test activated brnl filter.');
+assert(strpos($pp->brnl()->processString($in), 'br/'), 'Test activated brnl filter.');
+#
+# %cgx%6%
+$in = '%cgx%1%';
+$out = $pp->quicklinks()->processString($in);
+assert(strpos($out, 'https://www.wechall.net/cgx') === 0, 'Test if %cgx% wechall.net link works.');
+$in = '%wc%gizmore%';
+$out = $pp->quicklinks()->processString($in);
+assert(strpos($out, 'https://www.wechall.net/profile/gizmore') === 0, 'Test if %wc% profile link works.');
 #
 # Stats
-echo "Done!\n";
+echo "All tests passed!\n";
