@@ -13,9 +13,19 @@ Transpile to ASCIICode, youTube description and Markdown.
 
 Used in my *CI*. :)
 
-(TODO) Apply a permission system for wc somehow.
 
+## Output modes
 
+ - ASCII
+ - Unicode
+ - ASCIICode
+ - Markdown
+ - YouTube
+ - GitHub
+ - Twitter (Planned)
+ 
+ 
+ 
 
 ## Own Additions
 
@@ -36,19 +46,22 @@ B) Better readable source:
  
 C) Smileys like `:)` can be ignored or become:
 github smileys, markdown images, utf8smileys.
+
  
+D) Permission system. `%score%500%`: Userlevel of 500 required.
+
  
-D) Ideas?
+E) Ideas?
  
  - `%dd%gizmore.org%`: make a link to `//gizmore.org`. Put a `![text](url)` markdown image preview beside the link.
  
- 
 ---
 
-## Usage
+### Usage
 
+### Options
 
-
+---
 
 #### License MIT
 ##### (c)2023 gizmore@wechall.net

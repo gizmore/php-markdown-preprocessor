@@ -1,19 +1,40 @@
 <?php
 namespace gizmore\pp;
 
+use gizmore\pp4md\PP4MD;
+
 require 'vendor/autoload.php';
+
+global $argv;
 
 $rest = null;
 
-$opt = getopt('ho::Rrpsvu', ['outfile::', 'replace', 'recursive', 'verbose', 'help', 'simulate', 'uglify'], $rest);
+$opt = getopt('fho::rv', [
+	'force',
+	'help',
+	'outfile::',
+	'recursive',
+	'verbose',
+	# PP options
+	'brnl',
+	'format:',
+	'quicklinks',
+	'rulers',
+	'smileys::',
+], $rest);
 
 $files = array_slice($argv, $rest);
 
-$pp = new Preprocessor();
+$pp = new PP4MD();
 
-###############
-### Options ###
-###############
+if (count($files) > 1)
+{
+	$pp->usageError('Too many paramteres.');
+}
+
+# ##############
+# ## Options ###
+# ##############
 if (isset($opt['h']) || (isset($opt['help'])) || count($files) > 1)
 {
 	echo "Usage: {$argv[0]} [--help] [--verbose] [--simulate] [--outfile] [--recursive] [--replace] [<path>]";
